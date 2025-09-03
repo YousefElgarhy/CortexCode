@@ -270,8 +270,11 @@ document.addEventListener("DOMContentLoaded", () => {
             if (await showConfirm("إعادة توليد الإجابة", "سيتم حذف هذه الإجابة وكل الرسائل التالية. هل تريد المتابعة؟")) {
                 const convo = allConversations.find(c => c.id === activeConversationId);
                 const userMessage = convo.messages[botMessageIndex - 1];
-                convo.messages = convo.messages.slice(0, botMessageIndex - 1);
-                saveConversations(); loadConversation(activeConversationId);
+                // ***!!! السطر التالي هو الذي تم تعديله !!!***
+                // يمسح رسالة الذكاء الاصطناعي فقط بدلاً من رسالة المستخدم معها
+                convo.messages = convo.messages.slice(0, botMessageIndex);
+                saveConversations(); 
+                loadConversation(activeConversationId);
                 sendMessage(userMessage, true);
             }
         });
