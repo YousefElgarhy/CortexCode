@@ -1,130 +1,29 @@
-<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cortex Code</title>
-    <link rel="stylesheet" href="style.css">
-    <!-- Google Fonts for a modern look -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
-    <!-- Font Awesome for icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    <!-- Library for rendering Markdown and Syntax Highlighting -->
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
-</head>
-<body>
-    <div id="app-container">
-        <!-- Sidebar -->
-        <aside id="sidebar">
-            <div class="sidebar-header">
-                <h1 class="logo">Cortex Code</h1>
-                <div class="sidebar-actions">
-                    <button id="theme-toggle-btn" class="sidebar-icon-btn" title="تبديل المظهر">
-                        <i class="fas fa-sun"></i>
-                    </button>
-                    <button id="settings-btn" class="sidebar-icon-btn" title="تعليمات مخصصة">
-                        <i class="fas fa-cog"></i>
-                    </button>
-                    <button id="new-chat-btn" class="sidebar-action-btn">
-                        <i class="fas fa-plus"></i>
-                        <span>محادثة جديدة</span>
-                    </button>
-                </div>
-            </div>
-            <div class="chat-history-container">
-                <h2 class="history-title">المحادثات السابقة</h2>
-                <div id="chat-history-list">
-                    <!-- Chat history will be loaded here by JavaScript -->
-                </div>
-            </div>
-        </aside>
-
-        <!-- Main Chat Area -->
-        <main id="chat-area">
-             <!-- Overlay for mobile when sidebar is open -->
-            <div id="overlay"></div>
-            <!-- Button to toggle sidebar -->
-            <button id="sidebar-toggle-btn"><i class="fas fa-bars"></i></button>
-
-            <div id="welcome-screen">
-                <div class="logo-large">Cortex Code</div>
-                <p>مساعدك الذكي لتطوير الأكواد</p>
-            </div>
-
-            <div id="chat-box" class="hidden">
-                <!-- Messages will appear here -->
-            </div>
-
-            <div id="input-container">
-                <!-- Image Preview Container -->
-                <div id="image-preview-container" class="hidden">
-                    <img id="image-preview" src="#" alt="Image preview" />
-                    <button id="remove-image-btn">&times;</button>
-                </div>
-
-                <div class="input-wrapper">
-                    <input type="file" id="image-upload-input" accept="image/*" class="hidden">
-                    <button id="image-upload-btn" class="input-action-btn" title="إرفاق صورة">
-                        <i class="fas fa-paperclip"></i>
-                    </button>
-                    <textarea id="user-input" placeholder="اسأل أي شيء عن البرمجة أو صِف الصورة..." rows="1"></textarea>
-                    <button id="send-btn" title="إرسال">
-                        <i class="fas fa-paper-plane"></i>
-                    </button>
-                    <button id="stop-btn" title="إيقاف التوليد" class="hidden">
-                        <i class="fas fa-stop"></i>
-                    </button>
-                </div>
-                <div class="disclaimer-wrapper">
-                    <p class="disclaimer">
-                        Cortex Code قد يرتكب أخطاء. تحقق من المعلومات المهمة.
-                    </p>
-                    <p class="credit">
-                        Made with ❤️ by Yousef
-                    </p>
-                </div>
-            </div>
-        </main>
+<div id="input-container">
+    <!-- Image Preview Container for multiple images -->
+    <div id="image-preview-container" class="hidden">
+        <!-- Images will be added here by JavaScript -->
     </div>
 
-    <!-- Modals -->
-    <div id="settings-modal" class="modal-overlay hidden">
-        <div class="modal-content">
-            <button class="modal-close-btn">&times;</button>
-            <h2>تعليمات مخصصة</h2>
-            <p>يمكنك هنا وضع تعليمات دائمة للذكاء الاصطناعي ليفهم أسلوبك أو متطلباتك في كل محادثة.</p>
-            <textarea id="custom-instructions-input" placeholder="مثال: أنا مبرمج TypeScript، قدم كل الأمثلة البرمجية باستخدام TypeScript..."></textarea>
-            <button id="save-instructions-btn" class="modal-action-btn">حفظ</button>
-        </div>
+    <div class="input-wrapper">
+        <!-- The "multiple" attribute is added here -->
+        <input type="file" id="image-upload-input" accept="image/*" class="hidden" multiple>
+        <button id="image-upload-btn" class="input-action-btn" title="إرفاق صورة (5 كحد أقصى)">
+            <i class="fas fa-paperclip"></i>
+        </button>
+        <textarea id="user-input" placeholder="اسأل أي شيء عن البرمجة أو صِف الصور..." rows="1"></textarea>
+        <button id="send-btn" title="إرسال">
+            <i class="fas fa-paper-plane"></i>
+        </button>
+        <button id="stop-btn" title="إيقاف التوليد" class="hidden">
+            <i class="fas fa-stop"></i>
+        </button>
     </div>
-
-    <div id="custom-confirm-modal" class="modal-overlay hidden">
-        <div class="modal-content">
-            <h2 id="confirm-modal-title"></h2>
-            <p id="confirm-modal-text"></p>
-            <div class="modal-buttons">
-                <button id="confirm-modal-cancel-btn" class="modal-action-btn secondary">إلغاء</button>
-                <button id="confirm-modal-ok-btn" class="modal-action-btn">تأكيد</button>
-            </div>
-        </div>
+    <div class="disclaimer-wrapper">
+        <p class="disclaimer">
+            Cortex Code قد يرتكب أخطاء. تحقق من المعلومات المهمة.
+        </p>
+        <p class="credit">
+            Made with ❤️ by Yousef
+        </p>
     </div>
-
-    <div id="custom-prompt-modal" class="modal-overlay hidden">
-         <div class="modal-content">
-            <h2 id="prompt-modal-title"></h2>
-            <p id="prompt-modal-text"></p>
-            <input type="text" id="prompt-modal-input" />
-            <div class="modal-buttons">
-                <button id="prompt-modal-cancel-btn" class="modal-action-btn secondary">إلغاء</button>
-                <button id="prompt-modal-ok-btn" class="modal-action-btn">حسناً</button>
-            </div>
-        </div>
-    </div>
-
-    <script src="script.js"></script>
-</body>
-</html>
+</div>
