@@ -1,33 +1,41 @@
-// استيراد الحزمة المطلوبة
 const fetch = require('node-fetch');
 
-// Vercel يقرأ متغيرات البيئة من إعدادات الموقع مباشرة
+// Vercel handles environment variables automatically
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:streamGenerateContent?key=${GEMINI_API_KEY}&alt=sse`;
 
-// هذه هي الدالة التي سيقوم Vercel بتشغيلها تلقائياً
-// عندما يتم استدعاء الرابط /api/generate
+// This is the function Vercel will run
 export default async function handler(req, res) {
-    // نتأكد أن الطلب من نوع POST فقط
     if (req.method !== 'POST') {
         return res.status(405).json({ error: 'Method Not Allowed' });
     }
 
-    // نتأكد أن مفتاح API موجود
     if (!GEMINI_API_KEY) {
         return res.status(500).json({ error: 'لم يتم العثور على مفتاح API في الخادم.' });
     }
 
     try {
-        // استخراج البيانات من الطلب القادم من واجهة الموقع
-        const { history, message, instructions, image } = req.body;
+        // We now expect "images" (plural) which is an array
+        const { history, message, instructions, images } = req.body;
 
         const systemPrompt = `You are Cortex Code, an elite AI programming assistant. Your responses must be clear, expertly formatted in Markdown, and use code blocks for all snippets. ${instructions || ''}`;
         
         const userMessageParts = [];
-        if (image && image.data) {
-            userMessageParts.push({ inline_data: { mime_type: image.mimeType, data: image.data } });
+        // *** MODIFICATION START ***
+        // If there are images, loop through them and add each one
+        if (images && images.length > 0) {
+            images.forEach(image => {
+                userMessageParts.push({ 
+                    inline_data: { 
+                        mime_type: image.mimeType, 
+                        data: image.data 
+                    } 
+                });
+            });
         }
+        // *** MODIFICATION END ***
+
+        // Always add the text part last
         userMessageParts.push({ text: message });
 
         const finalContents = [ ...history, { role: 'user', parts: userMessageParts } ];
@@ -43,14 +51,12 @@ export default async function handler(req, res) {
             ]
         };
 
-        // إرسال الطلب إلى Gemini API
         const response = await fetch(GEMINI_API_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
         });
 
-        // التعامل مع الأخطاء من Gemini
         if (!response.ok) {
              const errorData = await response.json();
              console.error('Google API Error:', JSON.stringify(errorData, null, 2));
@@ -60,12 +66,10 @@ export default async function handler(req, res) {
              throw new Error('An error occurred with the Google API.');
         }
 
-        // إعداد الرؤوس لإرسال رد متدفق (streaming response)
         res.setHeader('Content-Type', 'text/event-stream');
         res.setHeader('Cache-Control', 'no-cache');
         res.setHeader('Connection', 'keep-alive');
         
-        // تمرير الرد القادم من Gemini مباشرة إلى واجهة الموقع
         response.body.pipe(res);
 
     } catch (error) {
