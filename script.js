@@ -11,18 +11,17 @@ document.addEventListener("DOMContentLoaded", () => {
     const imageUploadBtn = document.getElementById("image-upload-btn");
     const imageUploadInput = document.getElementById("image-upload-input");
     const imagePreviewContainer = document.getElementById("image-preview-container");
-    const imagePreview = document.getElementById("image-preview");
-    const removeImageBtn = document.getElementById("remove-image-btn");
     const settingsModal = document.getElementById("settings-modal");
     const confirmModal = document.getElementById("custom-confirm-modal");
     const promptModal = document.getElementById("custom-prompt-modal");
 
     // API & State
     const API_URL = '/api/generate';
+    const MAX_IMAGES = 5;
     let allConversations = [];
     let activeConversationId = null;
     let abortController = null;
-    let uploadedImage = null;
+    let uploadedImages = []; // Changed to an array for multiple images
 
     // --- Modal Functions (Promise-based) ---
     const showModal = (modal, title, text, inputDefault = '') => {
@@ -102,9 +101,10 @@ document.addEventListener("DOMContentLoaded", () => {
     // --- Message Sending Logic ---
     const sendMessage = async (messageObject, isRegenerating = false) => {
         const messageText = messageObject.text || '';
-        const imageInfo = messageObject.imageInfo || (isRegenerating ? messageObject.imageInfo : uploadedImage);
+        // Changed to handle multiple images
+        const imagesInfo = messageObject.imagesInfo || (isRegenerating ? messageObject.imagesInfo : uploadedImages);
 
-        if (messageText.trim() === "" && !imageInfo) return;
+        if (messageText.trim() === "" && imagesInfo.length === 0) return;
 
         let currentConversation = allConversations.find(c => c.id === activeConversationId);
         if (!currentConversation) {
@@ -116,7 +116,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
         if (!isRegenerating) {
             const userMessage = { sender: 'U', text: messageText };
-            if (imageInfo) { userMessage.image = imageInfo.dataURL; userMessage.imageInfo = imageInfo; }
+            if (imagesInfo.length > 0) {
+                userMessage.images = imagesInfo.map(img => img.dataURL); // Store dataURLs for display
+                userMessage.imagesInfo = imagesInfo; // Store full info for regeneration
+            }
             appendMessage(userMessage, true, currentConversation.messages.length);
             currentConversation.messages.push(userMessage);
             userInput.value = ""; userInput.style.height = 'auto';
@@ -127,7 +130,7 @@ document.addEventListener("DOMContentLoaded", () => {
         userInput.disabled = true; sendBtn.classList.add('hidden'); stopBtn.classList.remove('hidden');
         abortController = new AbortController();
 
-        const thinkingIndicator = showThinkingIndicator();
+        const thinkingIndicator = showThinkingIndicator(); // Show thinking indicator
         let firstChunkReceived = false;
 
         try {
@@ -139,12 +142,14 @@ document.addEventListener("DOMContentLoaded", () => {
             const response = await fetch(API_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ history: apiHistory, message: messageText, instructions: customInstructions, image: imageInfo }),
+                // Pass the array of images to the backend
+                body: JSON.stringify({ history: apiHistory, message: messageText, instructions: customInstructions, images: imagesInfo }),
                 signal: abortController.signal
             });
 
             if (!response.ok) {
                 const errorData = await response.json();
+                thinkingIndicator.remove(); // Remove indicator on error
                 if (errorData.error === 'RATE_LIMIT_EXCEEDED') {
                     appendMessage({ sender: 'AI', text: '**لقد وصلت إلى حد الاستخدام المجاني.**\n\nيرجى المحاولة مرة أخرى لاحقًا.' }, true);
                 } else {
@@ -166,7 +171,7 @@ document.addEventListener("DOMContentLoaded", () => {
                             const chunkText = JSON.parse(line.substring(6)).candidates?.[0]?.content?.parts?.[0]?.text;
                             if (chunkText) {
                                 if (!firstChunkReceived) {
-                                    thinkingIndicator.remove();
+                                    thinkingIndicator.remove(); // Remove indicator on first chunk
                                     const botMessageIndex = currentConversation.messages.length;
                                     botMessageContainer = appendMessage({ sender: 'AI', text: '' }, true, botMessageIndex);
                                     contentDivs.set('main', botMessageContainer.querySelector('.message-content'));
@@ -196,7 +201,7 @@ document.addEventListener("DOMContentLoaded", () => {
             }
 
         } catch (error) {
-            thinkingIndicator.remove();
+            if(thinkingIndicator) thinkingIndicator.remove();
             if (error.name !== 'AbortError') {
                 console.error("Error:", error.message);
             }
@@ -219,11 +224,17 @@ document.addEventListener("DOMContentLoaded", () => {
         avatar.innerHTML = `<i class="fas ${message.sender === 'U' ? 'fa-user' : 'fa-robot'}"></i>`;
         const contentDiv = document.createElement('div'); contentDiv.className = 'message-content';
         
-        if (message.image) {
-            const img = document.createElement('img');
-            img.src = message.image;
-            img.style.cssText = 'max-width: 200px; border-radius: 8px; margin-bottom: 10px; display: block;';
-            contentDiv.appendChild(img);
+        // Handle multiple images for display
+        if (message.images && message.images.length > 0) {
+            const imageContainer = document.createElement('div');
+            imageContainer.style.cssText = 'display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px;';
+            message.images.forEach(imgSrc => {
+                const img = document.createElement('img');
+                img.src = imgSrc;
+                img.style.cssText = 'max-width: 100px; max-height: 100px; border-radius: 8px;';
+                imageContainer.appendChild(img);
+            });
+            contentDiv.appendChild(imageContainer);
         }
         contentDiv.innerHTML += marked.parse(message.text || '');
 
@@ -240,6 +251,7 @@ document.addEventListener("DOMContentLoaded", () => {
         return wrapper;
     }
     
+    // NEW: Function to show a thinking indicator
     function showThinkingIndicator() {
         const wrapper = document.createElement('div');
         wrapper.className = 'message-wrapper bot-message-wrapper';
@@ -270,9 +282,7 @@ document.addEventListener("DOMContentLoaded", () => {
             if (await showConfirm("إعادة توليد الإجابة", "سيتم حذف هذه الإجابة وكل الرسائل التالية. هل تريد المتابعة؟")) {
                 const convo = allConversations.find(c => c.id === activeConversationId);
                 const userMessage = convo.messages[botMessageIndex - 1];
-                // ***!!! السطر التالي هو الذي تم تعديله !!!***
-                // يمسح رسالة الذكاء الاصطناعي فقط بدلاً من رسالة المستخدم معها
-                convo.messages = convo.messages.slice(0, botMessageIndex);
+                convo.messages = convo.messages.slice(0, botMessageIndex - 1); // Go back to user message
                 saveConversations(); 
                 loadConversation(activeConversationId);
                 sendMessage(userMessage, true);
@@ -327,19 +337,76 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    // --- Event Handlers & Initial Load ---
+    // --- Image Handling (Modified for multiple images) ---
     const handleImageUpload = (event) => {
-        const file = event.target.files[0]; if (!file || !file.type.startsWith('image/')) return;
-        const reader = new FileReader();
-        reader.onloadend = () => {
-            uploadedImage = { mimeType: file.type, data: reader.result.split(',')[1], dataURL: reader.result };
-            imagePreview.src = reader.result;
-            imagePreviewContainer.classList.remove('hidden');
-        };
-        reader.readAsDataURL(file);
+        const files = event.target.files;
+        if (!files) return;
+
+        if (uploadedImages.length + files.length > MAX_IMAGES) {
+            alert(`لا يمكنك رفع أكثر من ${MAX_IMAGES} صور.`);
+            return;
+        }
+
+        for (const file of files) {
+            if (!file.type.startsWith('image/')) continue;
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                uploadedImages.push({ 
+                    mimeType: file.type, 
+                    data: reader.result.split(',')[1], 
+                    dataURL: reader.result 
+                });
+                renderImagePreviews();
+            };
+            reader.readAsDataURL(file);
+        }
     };
-    const resetImageUpload = () => { uploadedImage = null; imageUploadInput.value = ''; imagePreviewContainer.classList.add('hidden'); };
-    const startNewChat = () => { activeConversationId = null; chatBox.innerHTML = ''; welcomeScreen.classList.remove("hidden"); chatBox.classList.add("hidden"); renderChatHistory(); resetImageUpload(); };
+
+    const renderImagePreviews = () => {
+        imagePreviewContainer.innerHTML = '';
+        if (uploadedImages.length > 0) {
+            imagePreviewContainer.classList.remove('hidden');
+            uploadedImages.forEach((image, index) => {
+                const previewItem = document.createElement('div');
+                previewItem.className = 'preview-item';
+
+                const img = document.createElement('img');
+                img.src = image.dataURL;
+                img.className = 'preview-image';
+                
+                const removeBtn = document.createElement('button');
+                removeBtn.className = 'remove-image-btn';
+                removeBtn.innerHTML = '&times;';
+                removeBtn.onclick = () => {
+                    uploadedImages.splice(index, 1);
+                    renderImagePreviews();
+                };
+
+                previewItem.appendChild(img);
+                previewItem.appendChild(removeBtn);
+                imagePreviewContainer.appendChild(previewItem);
+            });
+        } else {
+            imagePreviewContainer.classList.add('hidden');
+        }
+    };
+
+    const resetImageUpload = () => { 
+        uploadedImages = [];
+        imageUploadInput.value = ''; // Clear the input field
+        renderImagePreviews();
+    };
+
+    // --- Event Handlers & Initial Load ---
+    const startNewChat = () => { 
+        activeConversationId = null; 
+        chatBox.innerHTML = ''; 
+        welcomeScreen.classList.remove("hidden"); 
+        chatBox.classList.add("hidden"); 
+        renderChatHistory(); 
+        resetImageUpload(); 
+    };
+    
     const editConversationTitle = async (id) => {
         const convo = allConversations.find(c => c.id === id);
         const newTitle = await showPrompt("تعديل العنوان", "أدخل العنوان الجديد:", convo.title);
@@ -357,14 +424,13 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     };
 
-    sendBtn.addEventListener('click', () => sendMessage({ text: userInput.value }));
-    userInput.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage({ text: userInput.value }); } });
+    sendBtn.addEventListener('click', () => sendMessage({ text: userInput.value, imagesInfo: uploadedImages }));
+    userInput.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage({ text: userInput.value, imagesInfo: uploadedImages }); } });
     stopBtn.addEventListener('click', () => { if (abortController) abortController.abort(); });
     newChatBtn.addEventListener('click', startNewChat);
     themeToggleBtn.addEventListener('click', toggleTheme);
     imageUploadBtn.addEventListener('click', () => imageUploadInput.click());
     imageUploadInput.addEventListener('change', handleImageUpload);
-    removeImageBtn.addEventListener('click', resetImageUpload);
     document.getElementById('settings-btn').addEventListener('click', () => showModal(settingsModal, "تعليمات مخصصة", "..."));
     settingsModal.querySelector('.modal-close-btn').onclick = () => settingsModal.classList.add("hidden");
     settingsModal.querySelector('#save-instructions-btn').onclick = () => {
